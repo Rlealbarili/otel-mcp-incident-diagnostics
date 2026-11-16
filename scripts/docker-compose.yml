@@ -1,0 +1,160 @@
+# ==============================================================================
+# Docker Compose - System Health Observability & Incident Diagnostics (CIRES-R)
+# Milestone 2: Grafana LGTM Stack & OpenTelemetry Collector Blueprint
+# ==============================================================================
+
+networks:
+  health-net:
+    name: health-net
+    driver: bridge
+
+volumes:
+  otel-storage:
+    name: health-otel-storage
+  grafana-data:
+    name: health-grafana-data
+  loki-data:
+    name: health-loki-data
+  tempo-data:
+    name: health-tempo-data
+  prometheus-data:
+    name: health-prometheus-data
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. OpenTelemetry Collector (Contrib)
+  # Ingress Gateway with Fail-Closed PHI/PII Redactor & Persistent Disk Queue
+  # ----------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: health-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - otel-storage:/var/lib/otelcol/file_storage
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+    environment:
+      - GOMEMLIMIT=400MiB
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    networks:
+      - health-net
+
+  # ----------------------------------------------------------------------------
+  # 2. Grafana
+  # Observability UI & Unified Dashboarding
+  # ----------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: health-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Grafana Web UI
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_FEATURE_TOGGLES_ENABLE=traceToMetrics traceToLogs traceqlSearch
+    volumes:
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    networks:
+      - health-net
+
+  # ----------------------------------------------------------------------------
+  # 3. Loki
+  # Log Aggregation & LogQL Query Engine
+  # ----------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:latest
+    container_name: health-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"   # Loki HTTP API
+    volumes:
+      - loki-data:/tmp/loki
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - health-net
+
+  # ----------------------------------------------------------------------------
+  # 4. Tempo
+  # Distributed Tracing & TraceQL Engine
+  # ----------------------------------------------------------------------------
+  tempo:
+    image: grafana/tempo:latest
+    container_name: health-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200"   # Tempo HTTP API & Query
+    volumes:
+      - tempo-data:/var/tempo
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - health-net
+
+  # ----------------------------------------------------------------------------
+  # 5. Prometheus
+  # Time-Series Metrics & PromQL Engine
+  # ----------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: health-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"
+    ports:
+      - "9090:9090"   # Prometheus Web UI & API
+    volumes:
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - health-net

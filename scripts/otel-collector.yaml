@@ -1,0 +1,151 @@
+# OpenTelemetry Collector Configuration with Fail-Closed Redactor & Persistent Disk Queue
+# Framework: CIRES-R (Health Data Observability & Automated Incident Diagnostics)
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  file_storage:
+    directory: /var/lib/otelcol/file_storage
+    timeout: 1s
+    compaction:
+      directory: /var/lib/otelcol/file_storage
+      on_start: true
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  transform/fail_closed_redactor:
+    error_mode: propagate
+    log_statements:
+      - context: log
+        statements:
+          - replace_all_patterns(body, "value", "-----BEGIN[A-Z\\s]+PRIVATE KEY-----[\\s\\S]*?-----END[A-Z\\s]+PRIVATE KEY-----", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\b(?:postgres|postgresql|mysql|mongodb|redis|amqp):\\/\\/[^\\s'\";]+\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\beyJ[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "Bearer\\s+[a-zA-Z0-9._~+/-]+=*", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\b(?:sk|pk)[-_][a-zA-Z0-9_-]{16,}\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\bapi[_-]?key[=\\s:]+['\"]?[a-zA-Z0-9_-]{16,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\b(?:password|passwd|secret|token|auth_key)[=\\s:]+['\"]?[^\\s'\";]{3,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "\\b\\d{3}-\\d{2}-\\d{4}\\b", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(body, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "[REDACTED_FAIL_CLOSED]") where is_string(body)
+          - replace_all_patterns(attributes, "value", "-----BEGIN[A-Z\\s]+PRIVATE KEY-----[\\s\\S]*?-----END[A-Z\\s]+PRIVATE KEY-----", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:postgres|postgresql|mysql|mongodb|redis|amqp):\\/\\/[^\\s'\";]+\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\beyJ[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "Bearer\\s+[a-zA-Z0-9._~+/-]+=*", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:sk|pk)[-_][a-zA-Z0-9_-]{16,}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\bapi[_-]?key[=\\s:]+['\"]?[a-zA-Z0-9_-]{16,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:password|passwd|secret|token|auth_key)[=\\s:]+['\"]?[^\\s'\";]{3,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}-\\d{2}-\\d{4}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "[REDACTED_FAIL_CLOSED]")
+
+    trace_statements:
+      - context: span
+        statements:
+          - replace_all_patterns(attributes, "value", "-----BEGIN[A-Z\\s]+PRIVATE KEY-----[\\s\\S]*?-----END[A-Z\\s]+PRIVATE KEY-----", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:postgres|postgresql|mysql|mongodb|redis|amqp):\\/\\/[^\\s'\";]+\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\beyJ[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "Bearer\\s+[a-zA-Z0-9._~+/-]+=*", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:sk|pk)[-_][a-zA-Z0-9_-]{16,}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\bapi[_-]?key[=\\s:]+['\"]?[a-zA-Z0-9_-]{16,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:password|passwd|secret|token|auth_key)[=\\s:]+['\"]?[^\\s'\";]{3,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}-\\d{2}-\\d{4}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "[REDACTED_FAIL_CLOSED]")
+
+    metric_statements:
+      - context: datapoint
+        statements:
+          - replace_all_patterns(attributes, "value", "-----BEGIN[A-Z\\s]+PRIVATE KEY-----[\\s\\S]*?-----END[A-Z\\s]+PRIVATE KEY-----", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:postgres|postgresql|mysql|mongodb|redis|amqp):\\/\\/[^\\s'\";]+\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\beyJ[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "Bearer\\s+[a-zA-Z0-9._~+/-]+=*", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:sk|pk)[-_][a-zA-Z0-9_-]{16,}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\bapi[_-]?key[=\\s:]+['\"]?[a-zA-Z0-9_-]{16,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b(?:password|passwd|secret|token|auth_key)[=\\s:]+['\"]?[^\\s'\";]{3,}['\"]?\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "\\b\\d{3}-\\d{2}-\\d{4}\\b", "[REDACTED_FAIL_CLOSED]")
+          - replace_all_patterns(attributes, "value", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "[REDACTED_FAIL_CLOSED]")
+
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 5000
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 60s
+      max_elapsed_time: 5m
+
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 5000
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 60s
+      max_elapsed_time: 5m
+
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 5000
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 60s
+      max_elapsed_time: 5m
+
+service:
+  extensions: [health_check, file_storage]
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: "0.0.0.0:8888"
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/fail_closed_redactor, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/fail_closed_redactor, batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/fail_closed_redactor, batch]
+      exporters: [otlphttp/loki]

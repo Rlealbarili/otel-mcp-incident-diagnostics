@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIRES-R — Software System Health & AI Incident Diagnostics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0c10;
+            --bg-card: rgba(18, 22, 31, 0.75);
+            --bg-card-hover: rgba(26, 32, 45, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #00f2fe;
+            --accent-blue: #4facfe;
+            --accent-purple: #7f00ff;
+            --accent-green: #00e676;
+            --accent-amber: #ffab00;
+            --accent-red: #ff1744;
+            --text-primary: #f0f4f8;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(127, 0, 255, 0.05) 0%, transparent 40%);
+            background-attachment: fixed;
+            padding-bottom: 40px;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+            background: rgba(10, 12, 16, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #000;
+            font-size: 18px;
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+        }
+
+        .logo-title h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-title p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .badge-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .badge-dot.amber {
+            background: var(--accent-amber);
+            box-shadow: 0 0 8px var(--accent-amber);
+        }
+
+        .badge-dot.red {
+            background: var(--accent-red);
+            box-shadow: 0 0 8px var(--accent-red);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 32px auto;
+            padding: 0 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: var(--bg-card-hover);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title-icon {
+            color: var(--accent-cyan);
+        }
+
+        .metric-value {
+            font-size: 2.2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, #fff, var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-cyan {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            color: #000;
+            box-shadow: 0 4px 14px rgba(0, 242, 254, 0.25);
+        }
+
+        .btn-cyan:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.35);
+        }
+
+        .btn-amber {
+            background: rgba(255, 171, 0, 0.15);
+            border: 1px solid rgba(255, 171, 0, 0.3);
+            color: var(--accent-amber);
+        }
+
+        .btn-amber:hover {
+            background: rgba(255, 171, 0, 0.25);
+        }
+
+        .btn-red {
+            background: rgba(255, 23, 68, 0.15);
+            border: 1px solid rgba(255, 23, 68, 0.3);
+            color: var(--accent-red);
+        }
+
+        .btn-red:hover {
+            background: rgba(255, 23, 68, 0.25);
+        }
+
+        .console-box {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: #05070a;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 16px;
+            height: 280px;
+            overflow-y: auto;
+            color: #d1d5db;
+            line-height: 1.6;
+        }
+
+        .console-line {
+            margin-bottom: 4px;
+        }
+
+        .console-line.success { color: var(--accent-green); }
+        .console-line.warning { color: var(--accent-amber); }
+        .console-line.error { color: var(--accent-red); }
+        .console-line.info { color: var(--accent-cyan); }
+
+        .nist-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .nist-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .nist-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .nist-card-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            margin-bottom: 4px;
+        }
+
+        .nist-card-desc {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-group">
+            <div class="logo-icon">S</div>
+            <div class="logo-title">
+                <h1>CIRES-R System Health Observability</h1>
+                <p>NIST CSF 2.0 & OpenTelemetry AI Software Diagnostics</p>
+            </div>
+        </div>
+        <div class="badge-group">
+            <div class="badge"><span class="badge-dot"></span> OTel Collector: ACTIVE</div>
+            <div class="badge"><span class="badge-dot"></span> Secret Sanitizer: FAIL-CLOSED</div>
+            <div class="badge"><span class="badge-dot amber"></span> Quality Score: 4.2/10</div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Top System Vitals Row -->
+        <div class="grid-3">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title"><span class="card-title-icon">⚡</span> System Ingestion Rate</span>
+                    <span class="badge">OTLP / gRPC</span>
+                </div>
+                <div class="metric-value" id="metric-ingestion">142 req/s</div>
+                <div class="metric-label">Microservice Vitals & DB Telemetry</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title"><span class="card-title-icon">⏱️</span> p99 API Latency</span>
+                    <span class="badge">Tempo Exemplar</span>
+                </div>
+                <div class="metric-value" id="metric-latency">42 ms</div>
+                <div class="metric-label">Service Mesh Processing Boundary</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title"><span class="card-title-icon">🛡️</span> Secret Sanitization</span>
+                    <span class="badge">Zero Leakage</span>
+                </div>
+                <div class="metric-value" id="metric-redaction">100.0%</div>
+                <div class="metric-label">Fail-Closed Credentials Masking</div>
+            </div>
+        </div>
+
+        <!-- System Fault Simulator & Control Panel -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title"><span class="card-title-icon">🧪</span> Software Fault Simulator & AI RCA Trigger</span>
+                <span class="metric-label">Inject synthetic system/software failures to test AI RCA</span>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cyan" onclick="simulateIngestion()">
+                    <span>▶ Ingest System Vitals Stream</span>
+                </button>
+                <button class="btn btn-amber" onclick="triggerFault('latency_spike')">
+                    <span>⚠️ Trigger API Latency Spike (3250ms)</span>
+                </button>
+                <button class="btn btn-amber" onclick="triggerFault('sensor_timeout')">
+                    <span>⏳ Trigger Microservice Timeout</span>
+                </button>
+                <button class="btn btn-red" onclick="triggerFault('ehr_error_500')">
+                    <span>🚨 Trigger DB Pool Exhaustion (500)</span>
+                </button>
+                <button class="btn btn-cyan" onclick="runRCADiagnostic()">
+                    <span>🔍 Run Autonomous Software RCA</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Two Column Main Workspace -->
+        <div class="grid-2">
+            <!-- Telemetry Stream & Console -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title"><span class="card-title-icon">📡</span> Software Telemetry Stream (Loki & OTel)</span>
+                    <button class="btn btn-amber" style="padding: 4px 10px; font-size: 0.75rem;" onclick="clearConsole()">Clear</button>
+                </div>
+                <div class="console-box" id="console-output">
+                    <div class="console-line info">[SYS] CIRES-R System Health Observability Engine Initialized.</div>
+                    <div class="console-line success">[OTEL] OTLP gRPC Exporter connected to collector at 0.0.0.0:4317.</div>
+                    <div class="console-line success">[SANITIZER] Secrets & Credentials Fail-Closed Transformer active.</div>
+                    <div class="console-line info">[HEALTH] Listening for incoming telemetry on /api/v1/health-events.</div>
+                </div>
+            </div>
+
+            <!-- AI RCA Diagnostic & Mitigation Plan -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title"><span class="card-title-icon">🧠</span> Autonomous Software RCA & NIST Playbook</span>
+                    <span class="badge" id="rca-status">Awaiting Diagnostic</span>
+                </div>
+                <div class="console-box" id="rca-output">
+                    <div class="console-line info">Click "Run Autonomous Software RCA" or trigger a fault above to generate an automated RCA Diagnostic Report.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NIST CSF 2.0 Mapping Footer -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title"><span class="card-title-icon">🏛️</span> NIST Cybersecurity Framework (CSF) 2.0 Integration</span>
+            </div>
+            <div class="nist-grid">
+                <div class="nist-card">
+                    <div class="nist-card-title">1. GOVERN</div>
+                    <div class="nist-card-desc">Level 2 Rules & Privacy Boundaries</div>
+                </div>
+                <div class="nist-card">
+                    <div class="nist-card-title">2. IDENTIFY</div>
+                    <div class="nist-card-desc">Secret Risk Vectors & Ingestion Telemetry</div>
+                </div>
+                <div class="nist-card">
+                    <div class="nist-card-title">3. PROTECT</div>
+                    <div class="nist-card-desc">Fail-Closed Sanitization & Disk Queues</div>
+                </div>
+                <div class="nist-card">
+                    <div class="nist-card-title">4. DETECT</div>
+                    <div class="nist-card-desc">Mimir Metrics → Tempo Traces → Loki Logs</div>
+                </div>
+                <div class="nist-card">
+                    <div class="nist-card-title">5. RESPOND</div>
+                    <div class="nist-card-desc">MCP Diagnostic Agent & Automated Playbooks</div>
+                </div>
+                <div class="nist-card">
+                    <div class="nist-card-title">6. RECOVER</div>
+                    <div class="nist-card-desc">Persistent Queue Recovery & Post-Mortem RAG</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function logConsole(msg, type = 'info') {
+            const box = document.getElementById('console-output');
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            const timeStr = new Date().toISOString().split('T')[1].slice(0, 8);
+            line.textContent = `[${timeStr}] ${msg}`;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = '';
+            logConsole("Console cleared.", "info");
+        }
+
+        async function simulateIngestion() {
+            logConsole("Sending synthetic system vitals telemetry stream...", "info");
+            try {
+                const res = await fetch('/api/v1/health-events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_id: "SYS-USER-1001",
+                        vitals: { cpu_usage: 42.5, memory_mb: 1024, active_conn: 18 },
+                        notes: "Service Node-01 healthy, token sk-live-9999999999999999 sanitized"
+                    })
+                });
+                const data = await res.json();
+                logConsole(`[OTEL TRACE ${data.trace_id?.slice(0,8) || '001'}] Telemetry ingested. Secrets Redacted: ${data.phi_redacted}`, "success");
+            } catch (err) {
+                logConsole(`Ingestion Error: ${err.message}`, "error");
+            }
+        }
+
+        async function triggerFault(faultMode) {
+            logConsole(`Configuring Fault Simulator mode: ${faultMode}...`, "warning");
+            try {
+                const res = await fetch('/api/v1/fault-injection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fault_mode: faultMode,
+                        enabled: true,
+                        delay_seconds: faultMode === 'latency_spike' ? 3.25 : 0.0
+                    })
+                });
+                const data = await res.json();
+                logConsole(`[FAULT SIMULATOR] Mode ${faultMode} ENABLED.`, "error");
+            } catch (err) {
+                logConsole(`Fault Simulator Error: ${err.message}`, "error");
+            }
+        }
+
+        async function runRCADiagnostic() {
+            logConsole("Initiating Autonomous Software RCA Diagnostic via MCP Grafana...", "info");
+            const rcaBox = document.getElementById('rca-output');
+            const rcaStatus = document.getElementById('rca-status');
+            rcaStatus.textContent = "Analyzing...";
+            rcaStatus.className = "badge amber";
+
+            try {
+                const res = await fetch('/api/v1/query-diagnostic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trace_id: "abcdef0123456789abcdef0123456789",
+                        component: "db_connection_pool",
+                        fault_mode: "ehr_error_500",
+                        description: "DB Pool exhaustion error with connection string postgres://admin:secret123@db:5432/main"
+                    })
+                });
+                const report = await res.json();
+                
+                rcaStatus.textContent = "Report Generated";
+                rcaStatus.className = "badge";
+
+                rcaBox.innerHTML = `
+                    <div class="console-line success">=== SOFTWARE INCIDENT DIAGNOSTIC REPORT [${report.incident_id}] ===</div>
+                    <div class="console-line info">Category: ${report.incident_summary?.fault_category} | Severity: ${report.incident_summary?.severity}</div>
+                    <div class="console-line warning">CIRES Quality Score Anchor: ${report.cires_score}/10</div>
+                    <div class="console-line info">Secret Sanitization Verified: ${report.phi_redaction_verified}</div>
+                    <div class="console-line success">-- METRIC EVIDENCE --</div>
+                    <div class="console-line">${report.root_cause_evidence?.metric_evidence?.query}: ${report.root_cause_evidence?.metric_evidence?.value}</div>
+                    <div class="console-line success">-- TRACE EVIDENCE (Tempo) --</div>
+                    <div class="console-line">TraceID: ${report.root_cause_evidence?.trace_evidence?.trace_id} | Status: ${report.root_cause_evidence?.trace_evidence?.http_status_code}</div>
+                    <div class="console-line success">-- LOG EVIDENCE (Loki) --</div>
+                    <div class="console-line error">${report.root_cause_evidence?.log_evidence?.exception_class}: ${report.root_cause_evidence?.log_evidence?.exception_message}</div>
+                    <div class="console-line success">-- NIST CSF 2.0 MITIGATION PLAN --</div>
+                    <div class="console-line info">${report.mitigation_plan?.summary}</div>
+                `;
+                logConsole(`[RCA ENGINE] Software Diagnostic Report ${report.incident_id} created.`, "success");
+            } catch (err) {
+                logConsole(`RCA Error: ${err.message}`, "error");
+                rcaStatus.textContent = "Error";
+                rcaStatus.className = "badge red";
+            }
+        }
+    </script>
+</body>
+</html>
